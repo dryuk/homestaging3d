@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HomeStaging 3D</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-deep:    #0F0F0F;
+      --bg-panel:   #161616;
+      --bg-card:    #1E1E1E;
+      --bg-hover:   #252525;
+      --gold:       #C9A84C;
+      --gold-light: #E2C47A;
+      --text-main:  #F0EDE8;
+      --text-muted: #888880;
+      --text-dim:   #555550;
+      --border:     #2A2A2A;
+      --danger:     #C0392B;
+      --success:    #27AE60;
+      --sidebar-w:  280px;
+      --info-w:     260px;
+      --topbar-h:   56px;
+    }
+
+    html, body { height: 100%; overflow: hidden; background: var(--bg-deep); color: var(--text-main); font-family: 'DM Sans', sans-serif; font-size: 13px; }
+
+    /* ─── TOPBAR ─────────────────────────────── */
+    .topbar {
+      position: fixed; top: 0; left: 0; right: 0; height: var(--topbar-h);
+      background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 24px; padding: 0 20px;
+      z-index: 100;
+    }
+    .logo {
+      font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 400;
+      color: var(--gold); letter-spacing: 0.04em; white-space: nowrap;
+    }
+    .logo span { font-style: italic; color: var(--text-muted); font-size: 13px; font-family: 'DM Sans', sans-serif; margin-left: 8px; letter-spacing: 0; }
+    .topbar-sep { width: 1px; height: 24px; background: var(--border); }
+    .room-config { display: flex; align-items: center; gap: 10px; }
+    .room-config label { color: var(--text-muted); font-size: 12px; }
+    .room-config input {
+      width: 52px; background: var(--bg-card); border: 1px solid var(--border);
+      color: var(--text-main); padding: 4px 8px; border-radius: 4px; font-size: 12px;
+      font-family: 'DM Sans', sans-serif; text-align: center;
+    }
+    .room-config input:focus { outline: none; border-color: var(--gold); }
+    .room-config .unit { color: var(--text-dim); font-size: 11px; }
+    .btn-apply {
+      background: var(--gold); color: #000; border: none; padding: 5px 12px;
+      border-radius: 4px; font-size: 12px; font-weight: 500; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: background 0.2s;
+    }
+    .btn-apply:hover { background: var(--gold-light); }
+    .topbar-actions { margin-left: auto; display: flex; gap: 10px; }
+    .btn-ghost {
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      padding: 6px 14px; border-radius: 4px; font-size: 12px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+    .view-toggle {
+      display: flex; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; overflow: hidden;
+    }
+    .view-btn {
+      background: transparent; border: none; color: var(--text-muted); padding: 6px 12px;
+      font-size: 11px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      transition: all 0.2s; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .view-btn.active { background: var(--gold); color: #000; }
+    .view-btn:hover:not(.active) { color: var(--text-main); }
+
+    /* ─── LAYOUT ─────────────────────────────── */
+    .workspace {
+      position: fixed; top: var(--topbar-h); left: 0; right: 0; bottom: 0;
+      display: flex;
+    }
+
+    /* ─── CATALOG PANEL ──────────────────────── */
+    .catalog-panel {
+      width: var(--sidebar-w); background: var(--bg-panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+    }
+    .panel-title {
+      padding: 16px 16px 12px; font-family: 'Cormorant Garamond', serif;
+      font-size: 16px; font-weight: 400; color: var(--text-main); letter-spacing: 0.03em;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title small { display: block; font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-muted); font-weight: 300; margin-top: 2px; letter-spacing: 0; }
+    .categories {
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .cat-btn {
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 5px 10px; border-radius: 20px; font-size: 11px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s; white-space: nowrap;
+    }
+    .cat-btn:hover { border-color: var(--gold); color: var(--gold-light); }
+    .cat-btn.active { background: var(--gold); border-color: var(--gold); color: #000; font-weight: 500; }
+    .products-grid {
+      flex: 1; overflow-y: auto; padding: 10px; display: grid;
+      grid-template-columns: 1fr 1fr; gap: 8px; align-content: start;
+    }
+    .products-grid::-webkit-scrollbar { width: 4px; }
+    .products-grid::-webkit-scrollbar-track { background: transparent; }
+    .products-grid::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .product-card {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 8px; cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .product-card:hover { border-color: var(--gold); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+    .product-card:active { transform: translateY(0); }
+    .product-icon {
+      width: 100%; height: 60px; border-radius: 4px; margin-bottom: 7px;
+      display: flex; align-items: center; justify-content: center; font-size: 26px;
+    }
+    .product-name { font-size: 11px; color: var(--text-main); line-height: 1.3; font-weight: 400; }
+    .product-price { font-size: 10px; color: var(--gold); margin-top: 3px; }
+
+    /* ─── CANVAS ─────────────────────────────── */
+    .canvas-wrap {
+      flex: 1; position: relative; background: var(--bg-deep); overflow: hidden;
+    }
+    #canvas3d { display: block; width: 100%; height: 100%; }
+    .canvas-hint {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.6); color: var(--text-dim); font-size: 11px;
+      padding: 6px 14px; border-radius: 20px; pointer-events: none;
+      backdrop-filter: blur(4px); white-space: nowrap;
+    }
+    .selected-toolbar {
+      position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+      background: rgba(22,22,22,0.9); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 14px; display: none; gap: 10px;
+      align-items: center; backdrop-filter: blur(8px);
+    }
+    .selected-toolbar.visible { display: flex; }
+    .selected-name { color: var(--text-main); font-size: 12px; font-weight: 500; }
+    .btn-delete {
+      background: var(--danger); border: none; color: #fff; padding: 5px 12px;
+      border-radius: 4px; font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      transition: opacity 0.2s;
+    }
+    .btn-delete:hover { opacity: 0.8; }
+    .btn-deselect {
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .btn-deselect:hover { border-color: var(--text-muted); color: var(--text-main); }
+    .drag-hint { font-size: 11px; color: var(--text-dim); }
+
+    /* ─── INFO PANEL ─────────────────────────── */
+    .info-panel {
+      width: var(--info-w); background: var(--bg-panel); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+    }
+    .product-list-wrap { flex: 1; overflow-y: auto; padding: 10px; }
+    .product-list-wrap::-webkit-scrollbar { width: 4px; }
+    .product-list-wrap::-webkit-scrollbar-track { background: transparent; }
+    .product-list-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .list-item {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+      padding: 10px 12px; margin-bottom: 7px; display: flex; align-items: center; gap: 10px;
+    }
+    .list-item-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .list-item-info { flex: 1; min-width: 0; }
+    .list-item-name { font-size: 12px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .list-item-price { font-size: 11px; color: var(--gold); margin-top: 2px; }
+    .list-item-qty {
+      background: var(--bg-hover); color: var(--text-muted); font-size: 11px;
+      padding: 2px 7px; border-radius: 10px; flex-shrink: 0;
+    }
+    .empty-list {
+      text-align: center; color: var(--text-dim); font-size: 12px; padding: 30px 16px;
+      line-height: 1.6;
+    }
+    .empty-list .icon { font-size: 28px; margin-bottom: 8px; }
+    .list-footer {
+      border-top: 1px solid var(--border); padding: 14px 16px;
+    }
+    .list-total { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .list-total-label { color: var(--text-muted); font-size: 12px; }
+    .list-total-value { color: var(--gold-light); font-size: 14px; font-weight: 500; font-family: 'Cormorant Garamond', serif; }
+    .btn-export {
+      width: 100%; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted);
+      padding: 8px; border-radius: 5px; font-size: 12px; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.2s;
+    }
+    .btn-export:hover { border-color: var(--gold); color: var(--gold); }
+    .count-badge {
+      background: var(--gold); color: #000; font-size: 10px; font-weight: 600;
+      padding: 1px 6px; border-radius: 10px; margin-left: 6px;
+    }
+
+    /* ─── TOAST ──────────────────────────────── */
+    .toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);
+      padding: 10px 20px; border-radius: 8px; font-size: 12px; pointer-events: none;
+      opacity: 0; transition: all 0.3s; z-index: 9999; backdrop-filter: blur(8px);
+      border-left: 3px solid var(--gold);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">HomeStaging 3D <span>— Visualiseur</span></div>
+  <div class="topbar-sep"></div>
+  <div class="room-config">
+    <label>Pièce :</label>
+    <input type="number" id="roomW" value="5" min="2" max="20" step="0.5">
+    <span class="unit">m</span>
+    <span style="color:var(--text-dim)">×</span>
+    <input type="number" id="roomD" value="4" min="2" max="20" step="0.5">
+    <span class="unit">m</span>
+    <button class="btn-apply" onclick="applyRoomSize()">Appliquer</button>
+  </div>
+  <div class="topbar-sep"></div>
+  <div class="view-toggle">
+    <button class="view-btn active" id="btn3d" onclick="setView('3d')">Vue 3D</button>
+    <button class="view-btn" id="btn2d" onclick="setView('2d')">Plan 2D</button>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn-ghost" onclick="clearScene()">Vider la pièce</button>
+    <button class="btn-ghost" onclick="saveProject()">💾 Sauvegarder</button>
+    <button class="btn-ghost" onclick="loadProject()">📂 Charger</button>
+  </div>
+</header>
+
+<!-- WORKSPACE -->
+<div class="workspace">
+
+  <!-- CATALOGUE -->
+  <aside class="catalog-panel">
+    <div class="panel-title">
+      Catalogue
+      <small>Cliquez pour ajouter dans la pièce</small>
+    </div>
+    <div class="categories" id="categories"></div>
+    <div class="products-grid" id="productsGrid"></div>
+  </aside>
+
+  <!-- CANVAS 3D -->
+  <div class="canvas-wrap">
+    <canvas id="canvas3d"></canvas>
+    <div class="selected-toolbar" id="selectedToolbar">
+      <span class="selected-name" id="selectedName">—</span>
+      <span class="drag-hint">Glisser pour déplacer</span>
+      <button class="btn-deselect" onclick="deselect()">✕ Désélectionner</button>
+      <button class="btn-delete" onclick="deleteSelected()">🗑 Supprimer</button>
+    </div>
+    <div class="canvas-hint" id="canvasHint">Clic gauche : orbiter &nbsp;|&nbsp; Scroll : zoom &nbsp;|&nbsp; Clic droit : déplacer la vue</div>
+  </div>
+
+  <!-- INFO PANEL -->
+  <aside class="info-panel">
+    <div class="panel-title">
+      Sélection<span class="count-badge" id="itemCount">0</span>
+      <small>Produits placés dans la pièce</small>
+    </div>
+    <div class="product-list-wrap" id="productList">
+      <div class="empty-list">
+        <div class="icon">🛋️</div>
+        Aucun meuble ajouté.<br>Cliquez sur un produit<br>dans le catalogue.
+      </div>
+    </div>
+    <div class="list-footer">
+      <div class="list-total">
+        <span class="list-total-label">Estimation totale</span>
+        <span class="list-total-value" id="totalPrice">0 €</span>
+      </div>
+      <button class="btn-export" onclick="exportList()">📋 Exporter la liste</button>
+    </div>
+  </aside>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CATALOGUE
+// ═══════════════════════════════════════════════
+var CATALOG = {
+  categories: [
+    { id: 'all',      label: 'Tout',       emoji: '✦' },
+    { id: 'seating',  label: 'Assises',    emoji: '🪑' },
+    { id: 'tables',   label: 'Tables',     emoji: '🪵' },
+    { id: 'storage',  label: 'Rangements', emoji: '🗄️' },
+    { id: 'beds',     label: 'Chambres',   emoji: '🛏️' },
+    { id: 'deco',     label: 'Déco',       emoji: '🪴' }
+  ],
+  products: [
+    { id: 'canape-3p',    name: 'Canapé 3 places',       category: 'seating',  color: '#8B7A6A', emoji: '🛋️', dim: {w:2.2,d:0.9,h:0.8},  price: 899 },
+    { id: 'canape-2p',    name: 'Canapé 2 places',       category: 'seating',  color: '#6B8080', emoji: '🛋️', dim: {w:1.6,d:0.85,h:0.75}, price: 649 },
+    { id: 'fauteuil',     name: 'Fauteuil lounge',       category: 'seating',  color: '#A0622D', emoji: '💺', dim: {w:0.85,d:0.85,h:0.9}, price: 399 },
+    { id: 'chaise',       name: 'Chaise salle à manger', category: 'seating',  color: '#7A7A7A', emoji: '🪑', dim: {w:0.5,d:0.5,h:0.9},  price: 149 },
+    { id: 'table-basse',  name: 'Table basse',           category: 'tables',   color: '#C4A882', emoji: '🪵', dim: {w:1.2,d:0.6,h:0.4},  price: 249 },
+    { id: 'table-manger', name: 'Table à manger',        category: 'tables',   color: '#8B6914', emoji: '🍽️', dim: {w:1.8,d:0.9,h:0.75}, price: 599 },
+    { id: 'bureau',       name: 'Bureau',                category: 'tables',   color: '#9E8870', emoji: '🖥️', dim: {w:1.4,d:0.7,h:0.75}, price: 449 },
+    { id: 'armoire',      name: 'Armoire 3 portes',      category: 'storage',  color: '#D8CFC4', emoji: '🗄️', dim: {w:1.5,d:0.6,h:2.1},  price: 799 },
+    { id: 'bibliotheque', name: 'Bibliothèque',          category: 'storage',  color: '#C8A87A', emoji: '📚', dim: {w:1.0,d:0.35,h:1.8}, price: 349 },
+    { id: 'commode',      name: 'Commode 4 tiroirs',     category: 'storage',  color: '#E8DCC8', emoji: '🗃️', dim: {w:1.0,d:0.45,h:0.9}, price: 299 },
+    { id: 'lit-2p',       name: 'Lit double 160×200',    category: 'beds',     color: '#F0EBE3', emoji: '🛏️', dim: {w:1.8,d:2.1,h:0.5},  price: 699 },
+    { id: 'lit-1p',       name: 'Lit simple 90×200',     category: 'beds',     color: '#E8E0D8', emoji: '🛌', dim: {w:1.0,d:2.1,h:0.5},  price: 349 },
+    { id: 'table-nuit',   name: 'Table de chevet',       category: 'beds',     color: '#D4C5B0', emoji: '🕯️', dim: {w:0.5,d:0.4,h:0.55}, price: 149 },
+    { id: 'plante',       name: 'Plante d\'intérieur',   category: 'deco',     color: '#3A6B34', emoji: '🪴', dim: {w:0.5,d:0.5,h:1.4},  price: 89  },
+    { id: 'lampadaire',   name: 'Lampadaire',            category: 'deco',     color: '#B8860B', emoji: '💡', dim: {w:0.3,d:0.3,h:1.7},  price: 129 },
+    { id: 'tapis',        name: 'Tapis 200×300',         category: 'deco',     color: '#B8A090', emoji: '🟫', dim: {w:3.0,d:2.0,h:0.02}, price: 199 }
+  ]
+};
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+var state = {
+  activeCategory: 'all',
+  placedItems: [],      // { mesh, product, id }
+  selectedItem: null,
+  roomW: 5,
+  roomD: 4,
+  roomH: 2.8,
+  isDragging: false,
+  dragOffset: new THREE.Vector3(),
+  idCounter: 0
+};
+
+// ═══════════════════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════════════════
+var scene, camera, renderer, controls;
+var floorMesh, roomGroup;
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+var floorPlane = new THREE.Plane(new THREE.Vector3(0,1,0), 0);
+
+function initScene() {
+  var canvas = document.getElementById('canvas3d');
+  var wrap = canvas.parentElement;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x1A1A1A);
+  scene.fog = new THREE.FogExp2(0x1A1A1A, 0.04);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(45, wrap.clientWidth / wrap.clientHeight, 0.1, 100);
+  camera.position.set(6, 5, 7);
+  camera.lookAt(0, 0, 0);
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  // Lights
+  var ambientLight = new THREE.AmbientLight(0xFFF8F0, 0.6);
+  scene.add(ambientLight);
+
+  var sunLight = new THREE.DirectionalLight(0xFFF5E0, 1.2);
+  sunLight.position.set(5, 10, 5);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.width = 2048;
+  sunLight.shadow.mapSize.height = 2048;
+  sunLight.shadow.camera.near = 0.5;
+  sunLight.shadow.camera.far = 50;
+  sunLight.shadow.camera.left = -15;
+  sunLight.shadow.camera.right = 15;
+  sunLight.shadow.camera.top = 15;
+  sunLight.shadow.camera.bottom = -15;
+  scene.add(sunLight);
+
+  var fillLight = new THREE.DirectionalLight(0xD0E8FF, 0.3);
+  fillLight.position.set(-5, 3, -5);
+  scene.add(fillLight);
+
+  // Controls
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 1;
+  controls.maxDistance = 30;
+  controls.maxPolarAngle = Math.PI / 2 - 0.05;
+  controls.target.set(0, 0, 0);
+
+  // Build room
+  buildRoom();
+
+  // Events
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', onKeyDown);
+
+  animate();
+}
+
+// ═══════════════════════════════════════════════
+// ROOM
+// ═══════════════════════════════════════════════
+function buildRoom() {
+  if (roomGroup) scene.remove(roomGroup);
+  roomGroup = new THREE.Group();
+
+  var W = state.roomW;
+  var D = state.roomD;
+  var H = state.roomH;
+
+  // Floor
+  var floorGeo = new THREE.PlaneGeometry(W, D);
+  var floorMat = new THREE.MeshLambertMaterial({ color: 0xC8B49A });
+  floorMesh = new THREE.Mesh(floorGeo, floorMat);
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.receiveShadow = true;
+  floorMesh.userData.isFloor = true;
+  roomGroup.add(floorMesh);
+
+  // Floor grid
+  var gridHelper = new THREE.GridHelper(Math.max(W, D) * 2, Math.max(W, D) * 2, 0x555555, 0x333333);
+  gridHelper.position.y = 0.001;
+  roomGroup.add(gridHelper);
+
+  // Walls
+  var wallMat = new THREE.MeshLambertMaterial({ color: 0xF0EBE3, side: THREE.FrontSide });
+
+  // Back wall
+  var bw = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat);
+  bw.position.set(0, H/2, -D/2);
+  bw.receiveShadow = true;
+  roomGroup.add(bw);
+
+  // Left wall
+  var lw = new THREE.Mesh(new THREE.PlaneGeometry(D, H), wallMat);
+  lw.rotation.y = Math.PI / 2;
+  lw.position.set(-W/2, H/2, 0);
+  lw.receiveShadow = true;
+  roomGroup.add(lw);
+
+  // Right wall
+  var rw = new THREE.Mesh(new THREE.PlaneGeometry(D, H), wallMat);
+  rw.rotation.y = -Math.PI / 2;
+  rw.position.set(W/2, H/2, 0);
+  rw.receiveShadow = true;
+  roomGroup.add(rw);
+
+  // Baseboard (skirting)
+  var skirtMat = new THREE.MeshLambertMaterial({ color: 0xE8E0D8 });
+  [
+    [W, 0, -D/2, 0],
+    [W, 0,  D/2, Math.PI],
+    [D, -W/2, 0, Math.PI/2],
+    [D,  W/2, 0, -Math.PI/2]
+  ].forEach(function(s) {
+    var sk = new THREE.Mesh(new THREE.PlaneGeometry(s[0], 0.1), skirtMat);
+    sk.position.set(s[2], 0.05, s[1]);
+    sk.rotation.y = s[3];
+    roomGroup.add(sk);
+  });
+
+  // Ceiling (subtle)
+  var ceilMat = new THREE.MeshLambertMaterial({ color: 0xF8F5F0, side: THREE.BackSide });
+  var ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, D), ceilMat);
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.y = H;
+  roomGroup.add(ceil);
+
+  scene.add(roomGroup);
+
+  // Update camera target
+  controls.target.set(0, H * 0.3, 0);
+  controls.update();
+}
+
+// ═══════════════════════════════════════════════
+// FURNITURE
+// ═══════════════════════════════════════════════
+function addFurniture(product) {
+  var w = product.dim.w;
+  var d = product.dim.d;
+  var h = product.dim.h;
+
+  var geo = new THREE.BoxGeometry(w, h, d);
+  var color = new THREE.Color(product.color);
+  var mat = new THREE.MeshLambertMaterial({ color: color });
+  var mesh = new THREE.Mesh(geo, mat);
+
+  // Place at center, on floor
+  mesh.position.set(
+    (Math.random() - 0.5) * (state.roomW * 0.4),
+    h / 2,
+    (Math.random() - 0.5) * (state.roomD * 0.4)
+  );
+
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  var itemId = 'item_' + (++state.idCounter);
+  mesh.userData = { itemId: itemId, product: product, baseColor: color.clone() };
+
+  scene.add(mesh);
+  state.placedItems.push({ mesh: mesh, product: product, id: itemId });
+
+  updateProductList();
+  selectItem({ mesh: mesh, product: product, id: itemId });
+  showToast('✓ ' + product.name + ' ajouté');
+}
+
+function selectItem(item) {
+  // Deselect previous
+  if (state.selectedItem) {
+    state.selectedItem.mesh.material.emissive.set(0x000000);
+  }
+  state.selectedItem = item;
+  if (item) {
+    item.mesh.material.emissive.set(0x4A3A1A);
+    document.getElementById('selectedName').textContent = item.product.name;
+    document.getElementById('selectedToolbar').classList.add('visible');
+  } else {
+    document.getElementById('selectedToolbar').classList.remove('visible');
+  }
+}
+
+function deselect() {
+  if (state.selectedItem) {
+    state.selectedItem.mesh.material.emissive.set(0x000000);
+  }
+  state.selectedItem = null;
+  document.getElementById('selectedToolbar').classList.remove('visible');
+}
+
+function deleteSelected() {
+  if (!state.selectedItem) return;
+  scene.remove(state.selectedItem.mesh);
+  state.placedItems = state.placedItems.filter(function(i) { return i.id !== state.selectedItem.id; });
+  state.selectedItem = null;
+  document.getElementById('selectedToolbar').classList.remove('visible');
+  updateProductList();
+  showToast('🗑 Élément supprimé');
+}
+
+function clearScene() {
+  state.placedItems.forEach(function(item) { scene.remove(item.mesh); });
+  state.placedItems = [];
+  state.selectedItem = null;
+  document.getElementById('selectedToolbar').classList.remove('visible');
+  updateProductList();
+  showToast('Pièce vidée');
+}
+
+// ═══════════════════════════════════════════════
+// MOUSE INTERACTIONS
+// ═══════════════════════════════════════════════
+function getMouseNDC(e) {
+  var rect = renderer.domElement.getBoundingClientRect();
+  mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+}
+
+function getFurnitureMeshes() {
+  return state.placedItems.map(function(i) { return i.mesh; });
+}
+
+function onMouseDown(e) {
+  if (e.button !== 0) return;
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse, camera);
+
+  var meshes = getFurnitureMeshes();
+  var hits = raycaster.intersectObjects(meshes);
+
+  if (hits.length > 0) {
+    var hitMesh = hits[0].object;
+    var item = state.placedItems.find(function(i) { return i.mesh === hitMesh; });
+    if (item) {
+      selectItem(item);
+      state.isDragging = true;
+      controls.enabled = false;
+
+      // Compute drag offset on floor plane
+      var target = new THREE.Vector3();
+      raycaster.ray.intersectPlane(floorPlane, target);
+      state.dragOffset.copy(hitMesh.position).sub(target);
+      state.dragOffset.y = 0;
+    }
+  } else {
+    deselect();
+  }
+}
+
+function onMouseMove(e) {
+  if (!state.isDragging || !state.selectedItem) return;
+  getMouseNDC(e);
+  raycaster.setFromCamera(mouse, camera);
+
+  var target = new THREE.Vector3();
+  if (raycaster.ray.intersectPlane(floorPlane, target)) {
+    var mesh = state.selectedItem.mesh;
+    var h = state.selectedItem.product.dim.h;
+    var halfW = state.roomW / 2 - state.selectedItem.product.dim.w / 2;
+    var halfD = state.roomD / 2 - state.selectedItem.product.dim.d / 2;
+
+    var newX = Math.max(-halfW, Math.min(halfW, target.x + state.dragOffset.x));
+    var newZ = Math.max(-halfD, Math.min(halfD, target.z + state.dragOffset.z));
+    mesh.position.set(newX, h / 2, newZ);
+  }
+}
+
+function onMouseUp(e) {
+  if (state.isDragging) {
+    state.isDragging = false;
+    controls.enabled = true;
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape') deselect();
+  if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedItem) {
+    deleteSelected();
+  }
+  // Arrow keys for fine positioning
+  if (state.selectedItem && ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.key)) {
+    e.preventDefault();
+    var step = e.shiftKey ? 0.1 : 0.02;
+    var mesh = state.selectedItem.mesh;
+    var halfW = state.roomW / 2 - state.selectedItem.product.dim.w / 2;
+    var halfD = state.roomD / 2 - state.selectedItem.product.dim.d / 2;
+    if (e.key === 'ArrowLeft')  mesh.position.x = Math.max(-halfW, mesh.position.x - step);
+    if (e.key === 'ArrowRight') mesh.position.x = Math.min( halfW, mesh.position.x + step);
+    if (e.key === 'ArrowUp')    mesh.position.z = Math.max(-halfD, mesh.position.z - step);
+    if (e.key === 'ArrowDown')  mesh.position.z = Math.min( halfD, mesh.position.z + step);
+  }
+  // R key to rotate selected item
+  if (e.key === 'r' && state.selectedItem) {
+    state.selectedItem.mesh.rotation.y += Math.PI / 4;
+  }
+}
+
+// ═══════════════════════════════════════════════
+// VIEWS
+// ═══════════════════════════════════════════════
+function setView(mode) {
+  document.getElementById('btn3d').classList.toggle('active', mode === '3d');
+  document.getElementById('btn2d').classList.toggle('active', mode === '2d');
+  document.getElementById('canvasHint').textContent = mode === '3d'
+    ? 'Clic gauche : orbiter  |  Scroll : zoom  |  Clic droit : déplacer la vue'
+    : 'Vue de dessus — Scroll : zoom  |  R : pivoter l\'élément sélectionné';
+
+  if (mode === '2d') {
+    var camH = Math.max(state.roomW, state.roomD) * 1.4;
+    camera.position.set(0, camH, 0.001);
+    camera.lookAt(0, 0, 0);
+    controls.maxPolarAngle = 0.1;
+    controls.minPolarAngle = 0;
+  } else {
+    camera.position.set(6, 5, 7);
+    camera.lookAt(0, 0, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+    controls.minPolarAngle = 0;
+  }
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+// ═══════════════════════════════════════════════
+// ROOM SIZE
+// ═══════════════════════════════════════════════
+function applyRoomSize() {
+  var w = parseFloat(document.getElementById('roomW').value) || 5;
+  var d = parseFloat(document.getElementById('roomD').value) || 4;
+  state.roomW = Math.max(2, Math.min(20, w));
+  state.roomD = Math.max(2, Math.min(20, d));
+  buildRoom();
+  // Reposition items that are now outside
+  state.placedItems.forEach(function(item) {
+    var halfW = state.roomW / 2 - item.product.dim.w / 2;
+    var halfD = state.roomD / 2 - item.product.dim.d / 2;
+    item.mesh.position.x = Math.max(-halfW, Math.min(halfW, item.mesh.position.x));
+    item.mesh.position.z = Math.max(-halfD, Math.min(halfD, item.mesh.position.z));
+  });
+  showToast('Pièce redimensionnée : ' + state.roomW + 'm × ' + state.roomD + 'm');
+}
+
+// ═══════════════════════════════════════════════
+// SAVE / LOAD
+// ═══════════════════════════════════════════════
+function saveProject() {
+  var data = {
+    room: { w: state.roomW, d: state.roomD },
+    items: state.placedItems.map(function(item) {
+      return {
+        productId: item.product.id,
+        x: item.mesh.position.x,
+        z: item.mesh.position.z,
+        ry: item.mesh.rotation.y
+      };
+    })
+  };
+  localStorage.setItem('homestaging_project', JSON.stringify(data));
+  showToast('✓ Projet sauvegardé');
+}
+
+function loadProject() {
+  var saved = localStorage.getItem('homestaging_project');
+  if (!saved) { showToast('Aucun projet sauvegardé'); return; }
+  try {
+    var data = JSON.parse(saved);
+    clearScene();
+    state.roomW = data.room.w;
+    state.roomD = data.room.d;
+    document.getElementById('roomW').value = state.roomW;
+    document.getElementById('roomD').value = state.roomD;
+    buildRoom();
+    data.items.forEach(function(saved) {
+      var product = CATALOG.products.find(function(p) { return p.id === saved.productId; });
+      if (!product) return;
+      addFurniture(product);
+      var item = state.placedItems[state.placedItems.length - 1];
+      item.mesh.position.set(saved.x, product.dim.h / 2, saved.z);
+      item.mesh.rotation.y = saved.ry || 0;
+    });
+    deselect();
+    showToast('✓ Projet chargé — ' + data.items.length + ' éléments');
+  } catch(e) {
+    showToast('Erreur de chargement');
+  }
+}
+
+// ═══════════════════════════════════════════════
+// PRODUCT LIST
+// ═══════════════════════════════════════════════
+function updateProductList() {
+  var list = document.getElementById('productList');
+  var count = document.getElementById('itemCount');
+  var total = document.getElementById('totalPrice');
+
+  count.textContent = state.placedItems.length;
+
+  if (state.placedItems.length === 0) {
+    list.innerHTML = '<div class="empty-list"><div class="icon">🛋️</div>Aucun meuble ajouté.<br>Cliquez sur un produit<br>dans le catalogue.</div>';
+    total.textContent = '0 €';
+    return;
+  }
+
+  // Group by product id
+  var groups = {};
+  state.placedItems.forEach(function(item) {
+    var pid = item.product.id;
+    if (!groups[pid]) groups[pid] = { product: item.product, qty: 0 };
+    groups[pid].qty++;
+  });
+
+  var totalVal = 0;
+  var html = '';
+  Object.values(groups).forEach(function(g) {
+    totalVal += g.product.price * g.qty;
+    html += '<div class="list-item">'
+      + '<div class="list-item-dot" style="background:' + g.product.color + '"></div>'
+      + '<div class="list-item-info">'
+      +   '<div class="list-item-name">' + g.product.name + '</div>'
+      +   '<div class="list-item-price">' + g.product.price + ' €</div>'
+      + '</div>'
+      + '<div class="list-item-qty">×' + g.qty + '</div>'
+      + '</div>';
+  });
+
+  list.innerHTML = html;
+  total.textContent = totalVal.toLocaleString('fr-FR') + ' €';
+}
+
+function exportList() {
+  if (state.placedItems.length === 0) { showToast('Aucun produit à exporter'); return; }
+
+  var groups = {};
+  state.placedItems.forEach(function(item) {
+    var pid = item.product.id;
+    if (!groups[pid]) groups[pid] = { product: item.product, qty: 0 };
+    groups[pid].qty++;
+  });
+
+  var total = 0;
+  var lines = ['HOME STAGING 3D — Liste des produits', '═'.repeat(40), ''];
+  Object.values(groups).forEach(function(g) {
+    var subtotal = g.product.price * g.qty;
+    total += subtotal;
+    lines.push('• ' + g.product.name + ' × ' + g.qty + '  →  ' + subtotal + ' €');
+  });
+  lines.push('');
+  lines.push('═'.repeat(40));
+  lines.push('TOTAL ESTIMATIF : ' + total.toLocaleString('fr-FR') + ' €');
+
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = 'homestaging-liste.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✓ Liste exportée');
+}
+
+// ═══════════════════════════════════════════════
+// UI — CATALOGUE
+// ═══════════════════════════════════════════════
+function buildCatalogUI() {
+  var catsEl = document.getElementById('categories');
+  CATALOG.categories.forEach(function(cat) {
+    var btn = document.createElement('button');
+    btn.className = 'cat-btn' + (cat.id === 'all' ? ' active' : '');
+    btn.textContent = cat.emoji + ' ' + cat.label;
+    btn.onclick = function() {
+      state.activeCategory = cat.id;
+      document.querySelectorAll('.cat-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderProducts();
+    };
+    catsEl.appendChild(btn);
+  });
+  renderProducts();
+}
+
+function renderProducts() {
+  var grid = document.getElementById('productsGrid');
+  var filtered = state.activeCategory === 'all'
+    ? CATALOG.products
+    : CATALOG.products.filter(function(p) { return p.category === state.activeCategory; });
+
+  grid.innerHTML = '';
+  filtered.forEach(function(product) {
+    var card = document.createElement('div');
+    card.className = 'product-card';
+    card.innerHTML = '<div class="product-icon" style="background:' + product.color + '33"><span>' + product.emoji + '</span></div>'
+      + '<div class="product-name">' + product.name + '</div>'
+      + '<div class="product-price">' + product.price + ' €</div>';
+    card.onclick = function() { addFurniture(product); };
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+var toastTimer = null;
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { el.classList.remove('show'); }, 2200);
+}
+
+// ═══════════════════════════════════════════════
+// RESIZE
+// ═══════════════════════════════════════════════
+function onResize() {
+  var wrap = document.getElementById('canvas3d').parentElement;
+  camera.aspect = wrap.clientWidth / wrap.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+}
+
+// ═══════════════════════════════════════════════
+// ANIMATE
+// ═══════════════════════════════════════════════
+function animate() {
+  requestAnimationFrame(animate);
+  if (!state.isDragging) controls.update();
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+buildCatalogUI();
+initScene();
+</script>
+</body>
+</html>
+```
